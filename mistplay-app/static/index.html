@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mistplay Fraud Intelligence · Databricks</title>
+  <style>
+    :root {
+      --bg:       #0e0e11;
+      --surface:  #16161c;
+      --surface2: #1e1e27;
+      --border:   #2a2a38;
+      --text:     #e8e8f0;
+      --muted:    #8888a8;
+      --orange:   #ff3621;
+      --orange2:  #ff6b35;
+      --green:    #2dd36f;
+      --yellow:   #f5c518;
+      --red:      #ff4444;
+      --crimson:  #cc0033;
+      --radius:   12px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      padding: 24px 20px 60px;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 36px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 20px;
+    }
+
+    .db-logo {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--orange), var(--orange2));
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; font-weight: 900; color: #fff;
+      flex-shrink: 0;
+    }
+
+    header h1 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.01em;
+    }
+
+    header p {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .badge-live {
+      margin-left: auto;
+      background: rgba(45, 211, 111, 0.15);
+      color: var(--green);
+      border: 1px solid rgba(45, 211, 111, 0.3);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      display: flex; align-items: center; gap: 6px;
+    }
+
+    .dot-live {
+      width: 7px; height: 7px;
+      background: var(--green);
+      border-radius: 50%;
+      animation: pulse 1.8s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.4; transform: scale(0.7); }
+    }
+
+    /* ── Main grid ── */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 20px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 800px) {
+      .main-grid { grid-template-columns: 1fr; }
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+    }
+
+    .card-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 18px;
+    }
+
+    /* ── Form ── */
+    label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 6px; }
+
+    input[type="text"] {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.95rem;
+      padding: 10px 14px;
+      outline: none;
+      transition: border 0.2s;
+      margin-bottom: 16px;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--orange);
+    }
+
+    select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.88rem;
+      padding: 10px 14px;
+      outline: none;
+      cursor: pointer;
+      margin-bottom: 20px;
+      appearance: none;
+    }
+
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .field-row .field { margin-bottom: 0; }
+
+    .btn-primary {
+      width: 100%;
+      background: linear-gradient(135deg, var(--orange), var(--orange2));
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      padding: 12px;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      letter-spacing: 0.02em;
+    }
+
+    .btn-primary:hover  { opacity: 0.92; }
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 20px 0;
+    }
+
+    /* ── Endpoint info ── */
+    .meta-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 14px;
+    }
+
+    .meta-row span { color: var(--orange2); word-break: break-all; }
+
+    /* ── Result panel ── */
+    .result-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      min-height: 300px;
+      color: var(--muted);
+      gap: 12px;
+      font-size: 0.9rem;
+    }
+
+    .result-placeholder svg { opacity: 0.25; }
+
+    /* ── Gauge ── */
+    .gauge-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .gauge-svg { overflow: visible; }
+
+    .gauge-track { fill: none; stroke: var(--surface2); stroke-width: 18; stroke-linecap: round; }
+    .gauge-fill  { fill: none; stroke-width: 18; stroke-linecap: round;
+                   transition: stroke-dashoffset 0.8s cubic-bezier(.4,0,.2,1), stroke 0.5s; }
+
+    .gauge-score {
+      font-size: 3rem;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      fill: var(--text);
+      text-anchor: middle;
+      dominant-baseline: middle;
+    }
+
+    .gauge-label {
+      font-size: 0.78rem;
+      fill: var(--muted);
+      text-anchor: middle;
+    }
+
+    /* ── Risk badge ── */
+    .risk-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 20px;
+      border-radius: 30px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      margin-top: 12px;
+      border: 1px solid currentColor;
+    }
+
+    .risk-low      { color: var(--green);   background: rgba(45,211,111,0.1); }
+    .risk-medium   { color: var(--yellow);  background: rgba(245,197,24,0.1); }
+    .risk-high     { color: var(--red);     background: rgba(255,68,68,0.1);  }
+    .risk-critical { color: var(--crimson); background: rgba(204,0,51,0.12); }
+
+    /* ── Stats row ── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .stat-box {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--orange2);
+      letter-spacing: -0.03em;
+    }
+
+    .stat-label {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* ── Feature table ── */
+    .feature-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.83rem;
+    }
+
+    .feature-table th {
+      text-align: left;
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.72rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 0 0 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .feature-table th:last-child,
+    .feature-table td:last-child { text-align: right; }
+
+    .feature-table td {
+      padding: 9px 0;
+      border-bottom: 1px solid rgba(42,42,56,0.6);
+      color: var(--text);
+    }
+
+    .feature-table td:first-child { color: var(--muted); font-family: monospace; font-size: 0.78rem; }
+
+    .feat-bar-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .feat-bar {
+      width: 80px; height: 6px;
+      background: var(--surface2);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .feat-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.6s ease;
+    }
+
+    /* ── Latency chip ── */
+    .latency-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255,107,53,0.12);
+      border: 1px solid rgba(255,107,53,0.3);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 0.78rem;
+      color: var(--orange2);
+      font-weight: 700;
+    }
+
+    /* ── Loading spinner ── */
+    .spinner {
+      width: 28px; height: 28px;
+      border: 3px solid var(--border);
+      border-top-color: var(--orange);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-state {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 14px; min-height: 300px;
+      font-size: 0.85rem; color: var(--muted);
+    }
+
+    /* ── Error ── */
+    .error-box {
+      background: rgba(255,68,68,0.08);
+      border: 1px solid rgba(255,68,68,0.25);
+      border-radius: 8px;
+      padding: 14px 18px;
+      color: var(--red);
+      font-size: 0.85rem;
+      margin-top: 16px;
+    }
+
+    /* ── Footer ── */
+    .footer-note {
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-align: center;
+      margin-top: 30px;
+      opacity: 0.6;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="db-logo">⬡</div>
+  <div>
+    <h1>Mistplay Fraud Intelligence</h1>
+    <p>Real-time fraud scoring · Online Feature Store · Model Serving</p>
+  </div>
+  <div class="badge-live"><div class="dot-live"></div> LIVE ENDPOINT</div>
+</header>
+
+<div class="main-grid">
+
+  <!-- Left: Input panel -->
+  <div class="card">
+    <div class="card-title">Investigate Account</div>
+
+    <label>Quick-load sample</label>
+    <select id="sampleSelect" onchange="loadSample(this.value)">
+      <option value="">— choose a sample account —</option>
+    </select>
+
+    <div class="field-row">
+      <div class="field">
+        <label>Account ID</label>
+        <input type="text" id="accountId" placeholder="e.g. 3752" />
+      </div>
+      <div class="field">
+        <label>Device ID</label>
+        <input type="text" id="deviceId" placeholder="e.g. 2888" />
+      </div>
+    </div>
+
+    <button class="btn-primary" id="submitBtn" onclick="runPrediction()">
+      Check Fraud Score
+    </button>
+
+    <hr class="divider" />
+
+    <div class="meta-row">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+      </svg>
+      Endpoint: <span>mistplay_fraud_demo_v6</span>
+    </div>
+    <div class="meta-row">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path d="M4 7h16M4 12h16M4 17h16"/>
+      </svg>
+      Feature Store: <span>mistplay_fraud_features (online)</span>
+    </div>
+    <div class="meta-row">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+      </svg>
+      Model: <span>XGBoost · registered in MLflow</span>
+    </div>
+  </div>
+
+  <!-- Right: Result panel -->
+  <div class="card" id="resultPanel">
+    <div class="result-placeholder" id="emptyState">
+      <svg width="56" height="56" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.2">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      <div>Enter an Account ID + Device ID and hit <strong>Check Fraud Score</strong></div>
+    </div>
+
+    <div id="loadingState" class="loading-state" style="display:none">
+      <div class="spinner"></div>
+      <div>Fetching features from online store…</div>
+    </div>
+
+    <div id="resultContent" style="display:none">
+      <div class="card-title" id="resultTitle">Fraud Assessment</div>
+
+      <!-- Gauge -->
+      <div class="gauge-wrap">
+        <svg class="gauge-svg" width="220" height="130" viewBox="0 0 220 130">
+          <!-- Track arc: 180° semicircle, center (110, 110), r=85 -->
+          <path class="gauge-track"
+            d="M 25 110 A 85 85 0 0 1 195 110" />
+          <!-- Fill arc -->
+          <path class="gauge-fill" id="gaugeFill"
+            d="M 25 110 A 85 85 0 0 1 195 110" />
+          <!-- Score text -->
+          <text class="gauge-score" id="gaugeScore" x="110" y="95">—</text>
+          <text class="gauge-label" x="110" y="117">FRAUD SCORE</text>
+        </svg>
+        <div class="risk-badge" id="riskBadge">—</div>
+      </div>
+
+      <!-- Stats row -->
+      <div class="stats-row">
+        <div class="stat-box">
+          <div class="stat-value" id="statLatency">—</div>
+          <div class="stat-label">Latency (ms)</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="statAccount">—</div>
+          <div class="stat-label">Account ID</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="statDevice">—</div>
+          <div class="stat-label">Device ID</div>
+        </div>
+      </div>
+
+      <!-- Feature table -->
+      <div class="card-title">Online Feature Store — Fetched Features</div>
+      <table class="feature-table">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>Value</th>
+            <th style="text-align:right">Signal</th>
+          </tr>
+        </thead>
+        <tbody id="featureTableBody"></tbody>
+      </table>
+    </div>
+
+    <div id="errorBox" class="error-box" style="display:none"></div>
+  </div>
+
+</div>
+
+<p class="footer-note">
+  Powered by Databricks Model Serving · Online Feature Store · MLflow Registry
+  · fevm-ramin-serverless-aws.cloud.databricks.com
+</p>
+
+<script>
+// ── Feature metadata: display name + how to normalise for bar ──
+const FEATURE_META = {
+  reward_velocity_24h:       { label: 'Reward velocity (24h)',       max: 25,  highIsBad: true  },
+  session_count_7d:          { label: 'Session count (7d)',           max: 30,  highIsBad: false },
+  vpn_rate:                  { label: 'VPN usage rate',               max: 1,   highIsBad: true  },
+  device_risk_score:         { label: 'Device risk score',            max: 1,   highIsBad: true  },
+  country_mismatch:          { label: 'Country mismatch flag',        max: 1,   highIsBad: true  },
+  accounts_per_device_7d:    { label: 'Accounts per device (7d)',     max: 10,  highIsBad: true  },
+  emulator_flag:             { label: 'Emulator detected',            max: 1,   highIsBad: true  },
+  avg_session_minutes:       { label: 'Avg session duration (min)',   max: 30,  highIsBad: false },
+  reward_amount_total_7d:    { label: 'Total reward value (7d $)',    max: 500, highIsBad: true  },
+  time_to_first_redeem_hrs:  { label: 'Time to first redeem (hrs)',   max: 72,  highIsBad: false },
+};
+
+const RISK_CLASSES = {
+  Low:      'risk-low',
+  Medium:   'risk-medium',
+  High:     'risk-high',
+  Critical: 'risk-critical',
+};
+
+const RISK_ICONS = {
+  Low: '✓', Medium: '⚠', High: '⚠', Critical: '✕'
+};
+
+// ── Arc geometry for the gauge ──
+// The arc goes from angle=-180 (left) to 0 (right), center=(110,110), r=85
+// dasharray = π * r ≈ 267  (half circumference)
+const R  = 85;
+const HALF_CIRC = Math.PI * R; // ≈ 267
+
+function scoreToOffset(score100) {
+  // 0 → fully dashed (offset = HALF_CIRC), 100 → no offset (0)
+  return HALF_CIRC - (score100 / 100) * HALF_CIRC;
+}
+
+function scoreToColor(score100) {
+  if (score100 < 30) return '#2dd36f';
+  if (score100 < 60) return '#f5c518';
+  if (score100 < 80) return '#ff6b35';
+  return '#cc0033';
+}
+
+// ── Load sample list on page load ──
+async function loadSamples() {
+  try {
+    const res = await fetch('/api/samples');
+    const data = await res.json();
+    const sel = document.getElementById('sampleSelect');
+    data.samples.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = JSON.stringify(s);
+      opt.textContent = s.label;
+      sel.appendChild(opt);
+    });
+  } catch (_) {}
+}
+
+function loadSample(val) {
+  if (!val) return;
+  const s = JSON.parse(val);
+  document.getElementById('accountId').value = s.account_id;
+  document.getElementById('deviceId').value  = s.device_id;
+}
+
+// ── Run prediction ──
+async function runPrediction() {
+  const accountId = document.getElementById('accountId').value.trim();
+  const deviceId  = document.getElementById('deviceId').value.trim();
+  if (!accountId || !deviceId) {
+    alert('Please enter both Account ID and Device ID.');
+    return;
+  }
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Scoring…';
+
+  document.getElementById('emptyState').style.display   = 'none';
+  document.getElementById('loadingState').style.display = 'flex';
+  document.getElementById('resultContent').style.display = 'none';
+  document.getElementById('errorBox').style.display     = 'none';
+
+  try {
+    const res = await fetch('/api/predict', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({ account_id: accountId, device_id: deviceId }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+
+    const d = await res.json();
+    renderResult(d);
+
+  } catch (e) {
+    document.getElementById('loadingState').style.display = 'none';
+    const eb = document.getElementById('errorBox');
+    eb.textContent = '⚠ ' + e.message;
+    eb.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Check Fraud Score';
+  }
+}
+
+function renderResult(d) {
+  document.getElementById('loadingState').style.display  = 'none';
+  document.getElementById('resultContent').style.display = 'block';
+
+  // Title with latency chip
+  document.getElementById('resultTitle').innerHTML =
+    `Fraud Assessment &nbsp;
+     <span class="latency-chip">
+       <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l3 2"/></svg>
+       ${d.latency_ms} ms
+     </span>`;
+
+  // Gauge
+  const fill = document.getElementById('gaugeFill');
+  fill.style.strokeDasharray  = HALF_CIRC;
+  fill.style.strokeDashoffset = scoreToOffset(d.fraud_score);
+  fill.style.stroke           = scoreToColor(d.fraud_score);
+  document.getElementById('gaugeScore').textContent = d.fraud_score;
+
+  // Risk badge
+  const badge = document.getElementById('riskBadge');
+  badge.textContent = RISK_ICONS[d.risk_level] + '  ' + d.risk_level + ' Risk';
+  badge.className   = 'risk-badge ' + (RISK_CLASSES[d.risk_level] || '');
+
+  // Stats
+  document.getElementById('statLatency').textContent = d.latency_ms;
+  document.getElementById('statAccount').textContent = d.account_id;
+  document.getElementById('statDevice').textContent  = d.device_id;
+
+  // Feature table
+  const tbody = document.getElementById('featureTableBody');
+  tbody.innerHTML = '';
+  Object.entries(d.features).forEach(([key, val]) => {
+    const meta = FEATURE_META[key] || { label: key, max: 1, highIsBad: true };
+    const norm = Math.min(Math.max(parseFloat(val) / meta.max, 0), 1);
+    const pct  = Math.round(norm * 100);
+    const bad  = meta.highIsBad ? norm > 0.5 : norm < 0.5;
+    const barColor = bad ? '#ff6b35' : '#2dd36f';
+    const display  = Number.isInteger(val) ? val : parseFloat(val).toFixed(2);
+
+    tbody.innerHTML += `
+      <tr>
+        <td>${meta.label}</td>
+        <td>${display}</td>
+        <td>
+          <div class="feat-bar-wrap">
+            <div class="feat-bar">
+              <div class="feat-bar-fill" style="width:${pct}%;background:${barColor}"></div>
+            </div>
+          </div>
+        </td>
+      </tr>`;
+  });
+}
+
+// ── Enter key support ──
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') runPrediction();
+});
+
+loadSamples();
+</script>
+</body>
+</html>
